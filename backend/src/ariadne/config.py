@@ -55,7 +55,9 @@ class APISettings(BaseSettings):
 class Settings(BaseSettings):
     """Root application settings."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="ARIADNE_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_prefix="ARIADNE_", env_nested_delimiter="__", extra="ignore"
+    )
 
     app_name: str = Field(default="ARIADNE", description="Human readable application name")
     environment: AppEnv = Field(default="development", description="Runtime environment")
