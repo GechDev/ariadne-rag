@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, StaticPool, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from ariadne.config import get_settings
@@ -23,11 +23,14 @@ def get_engine() -> Engine:
     global _engine, _session_factory
     if _engine is None:
         settings = get_settings()
-        _engine = create_engine(
-            settings.database.url,
-            pool_pre_ping=settings.database.pool_pre_ping,
-            connect_args=settings.database.connect_args,
-        )
+        kwargs = {"pool_pre_ping": settings.database.pool_pre_ping}
+        if settings.database.url.startswith("sqlite://"):
+            kwargs["connect_args"] = {"check_same_thread": False}
+            if settings.database.url.endswith(":memory:"):
+                kwargs["poolclass"] = StaticPool
+        else:
+            kwargs["connect_args"] = settings.database.connect_args
+        _engine = create_engine(settings.database.url, **kwargs)
         _session_factory = sessionmaker(bind=_engine, expire_on_commit=False)
     return _engine
 

@@ -12,10 +12,14 @@ from ariadne.logging import get_logger
 
 
 def get_db(request: Request) -> Iterator[Session]:
-    """Provide a request-scoped database session."""
+    """Provide a request-scoped database session that commits on success."""
     session = get_session_factory()()
     try:
         yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
 
