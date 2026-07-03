@@ -16,7 +16,9 @@ from ariadne.documents.schemas import (
     UploadResponse,
 )
 from ariadne.documents.service import DocumentService
+from ariadne.ingestion.pipeline import IngestionPipeline
 from ariadne.logging import get_logger
+from ariadne.models import Chunk
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 logger = get_logger("documents.api")
@@ -51,6 +53,31 @@ def list_documents(
 ) -> list[DocumentSummary]:
     documents = service.list_documents(db, limit=limit, offset=offset)
     return [DocumentSummary.model_validate(doc) for doc in documents]
+
+
+@router.post("/{document_id}/ingest", status_code=200, summary="Ingest a document")
+def ingest_document(
+    db: Db,
+    service: Service,
+    document_id: str,
+    pipeline: Annotated[IngestionPipeline, Depends(lambda: IngestionPipeline())],
+) -> dict:
+    chunks = pipeline.ingest(db, document_id)
+    return {"document_id": document_id, "chunks": len(chunks), "status": "ready"}
+
+
+@router.get("/{document_id}/chunks", summary="List ingested chunks")
+def list_document_chunks(
+    db: Db,
+    service: Service,
+    document_id: str,
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+) -> list[dict]:
+    service.get(db, document_id)
+    query = db.query(Chunk).filter(Chunk.document_id == document_id)
+    chunks = query.order_by(Chunk.index).limit(limit).offset(offset)
+    return [IngestionPipeline.chunk_to_dict(chunk) for chunk in chunks]
 
 
 @router.get("/{document_id}", response_model=DocumentDetail, summary="Get a document")
