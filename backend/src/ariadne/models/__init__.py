@@ -6,6 +6,7 @@ Importing this package registers every model on the shared metadata so that
 
 from __future__ import annotations
 
+from ariadne.models.chunk import Chunk
 from ariadne.models.document import Document, DocumentStatus
 
-__all__ = ["Document", "DocumentStatus"]
+__all__ = ["Chunk", "Document", "DocumentStatus"]
