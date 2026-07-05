@@ -21,6 +21,7 @@ from ariadne.ingestion.parsers.base import ParsedDocument
 from ariadne.ingestion.parsers.registry import get_parser
 from ariadne.logging import get_logger
 from ariadne.models import Chunk, Document
+from ariadne.vectors.service import VectorIndexService
 
 logger = get_logger("ingestion.pipeline")
 
@@ -33,10 +34,12 @@ class IngestionPipeline:
         chunker: RecursiveChunker | None = None,
         storage: DocumentStorage | None = None,
         document_service: DocumentService | None = None,
+        vector_index: VectorIndexService | None = None,
     ) -> None:
         self.chunker = chunker or RecursiveChunker()
         self.storage = storage or DocumentStorage()
         self.documents = document_service or DocumentService(storage=self.storage)
+        self.vector_index = vector_index or VectorIndexService()
 
     def ingest(self, session: Session, document_id: str) -> list[Chunk]:
         """Parse, chunk and persist the given document. Returns the chunks."""
@@ -48,6 +51,7 @@ class IngestionPipeline:
             chunks = self._chunk(document.id, parsed)
             session.query(Chunk).filter(Chunk.document_id == document.id).delete()
             session.add_all(chunks)
+            self.vector_index.reindex_document(session, document.id, chunks)
             word_count = sum(len(chunk.text.split()) for chunk in chunks)
             self.documents.mark_ready(
                 session,

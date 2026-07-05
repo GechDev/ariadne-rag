@@ -8,5 +8,6 @@ from __future__ import annotations
 
 from ariadne.models.chunk import Chunk
 from ariadne.models.document import Document, DocumentStatus
+from ariadne.models.vector_entry import VectorEntry
 
-__all__ = ["Chunk", "Document", "DocumentStatus"]
+__all__ = ["Chunk", "Document", "DocumentStatus", "VectorEntry"]

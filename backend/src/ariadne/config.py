@@ -32,6 +32,17 @@ class StorageSettings(BaseSettings):
     )
 
 
+class EmbeddingSettings(BaseSettings):
+    """Embedding model settings."""
+
+    provider: str = Field(
+        default="deterministic",
+        description="Embedding provider: 'deterministic' or 'local'",
+    )
+    model: str = Field(default="all-MiniLM-L6-v2", description="Local model name")
+    dimension: int = Field(default=384, description="Deterministic provider dimension")
+
+
 class CorsSettings(BaseSettings):
     """CORS policy for the HTTP API."""
 
@@ -66,6 +77,7 @@ class Settings(BaseSettings):
     api: APISettings = Field(default_factory=APISettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
+    embeddings: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     cors: CorsSettings = Field(default_factory=CorsSettings)
 
 
