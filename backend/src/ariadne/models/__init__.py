@@ -8,6 +8,14 @@ from __future__ import annotations
 
 from ariadne.models.chunk import Chunk
 from ariadne.models.document import Document, DocumentStatus
+from ariadne.models.graph import GraphEntity, GraphRelationship
 from ariadne.models.vector_entry import VectorEntry
 
-__all__ = ["Chunk", "Document", "DocumentStatus", "VectorEntry"]
+__all__ = [
+    "Chunk",
+    "Document",
+    "DocumentStatus",
+    "GraphEntity",
+    "GraphRelationship",
+    "VectorEntry",
+]
