@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ariadne.core.errors import IngestionError
 from ariadne.documents.service import DocumentService
 from ariadne.documents.storage import DocumentStorage
+from ariadne.graph.service import GraphExtractionService
 from ariadne.ingestion.chunker import RecursiveChunker
 from ariadne.ingestion.parsers.base import ParsedDocument
 from ariadne.ingestion.parsers.registry import get_parser
@@ -35,11 +36,13 @@ class IngestionPipeline:
         storage: DocumentStorage | None = None,
         document_service: DocumentService | None = None,
         vector_index: VectorIndexService | None = None,
+        graph_service: GraphExtractionService | None = None,
     ) -> None:
         self.chunker = chunker or RecursiveChunker()
         self.storage = storage or DocumentStorage()
         self.documents = document_service or DocumentService(storage=self.storage)
         self.vector_index = vector_index or VectorIndexService()
+        self.graph_service = graph_service or GraphExtractionService()
 
     def ingest(self, session: Session, document_id: str) -> list[Chunk]:
         """Parse, chunk and persist the given document. Returns the chunks."""
@@ -52,6 +55,7 @@ class IngestionPipeline:
             session.query(Chunk).filter(Chunk.document_id == document.id).delete()
             session.add_all(chunks)
             self.vector_index.reindex_document(session, document.id, chunks)
+            self.graph_service.build_document_graph(session, document.id, chunks)
             word_count = sum(len(chunk.text.split()) for chunk in chunks)
             self.documents.mark_ready(
                 session,
