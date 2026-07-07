@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from ariadne.api.deps import get_db
 from ariadne.core.errors import EmbeddingProviderError
 from ariadne.embeddings.factory import get_embedding_provider
+from ariadne.graph.service import GraphExtractionService
+from ariadne.graph.store import GraphStore
 from ariadne.vectors.numpy_store import NumpyVectorStore
 from ariadne.vectors.service import VectorIndexService
 
@@ -32,6 +34,13 @@ class RetrievedChunk(BaseModel):
 
 class SearchResponse(BaseModel):
     """Result of a vector search."""
+
+    query: str
+    hits: list[RetrievedChunk]
+
+
+class GraphSearchResponse(BaseModel):
+    """Result of a knowledge-graph search."""
 
     query: str
     hits: list[RetrievedChunk]
@@ -64,5 +73,44 @@ def vector_search(
                 score=hit.score,
             )
             for hit in matches
+        ],
+    )
+
+
+@router.get(
+    "/graph/search", response_model=GraphSearchResponse, summary="Search the knowledge graph"
+)
+def graph_search(
+    db: Db,
+    q: str = Query(..., min_length=1, max_length=2000, description="Search query"),
+    top_k: int = Query(default=10, ge=1, le=50),
+    document_ids: list[str] | None = Query(default=None),
+) -> GraphSearchResponse:
+    from ariadne.models import Chunk
+
+    service = GraphExtractionService(store=GraphStore())
+    entities = service.query_entities_from_text(q)
+    matches = service.store.search(db, entities, document_ids=document_ids, top_k=top_k)
+
+    chunks = {
+        chunk.id: chunk
+        for chunk in db.query(Chunk)
+        .filter(Chunk.id.in_([match.chunk_id for match in matches]))
+        .all()
+    }
+    return GraphSearchResponse(
+        query=q,
+        hits=[
+            RetrievedChunk(
+                chunk_id=match.chunk_id,
+                document_id=match.document_id,
+                index=chunks[match.chunk_id].index if match.chunk_id in chunks else 0,
+                page_numbers=(
+                    chunks[match.chunk_id].page_numbers if match.chunk_id in chunks else []
+                ),
+                text=chunks[match.chunk_id].text if match.chunk_id in chunks else "",
+                score=match.score,
+            )
+            for match in matches
         ],
     )
