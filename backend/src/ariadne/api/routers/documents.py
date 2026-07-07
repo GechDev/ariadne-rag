@@ -102,6 +102,7 @@ def delete_document(
 ) -> DeleteResponse:
     service.get(db, document_id)
     pipeline.vector_index.delete_document(db, document_id)
+    pipeline.graph_service.store.delete_document(db, document_id)
     service.delete(db, document_id)
     logger.info("document deleted", extra={"document_id": document_id})
     return DeleteResponse(id=document_id)
