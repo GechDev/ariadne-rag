@@ -53,6 +53,19 @@ class CorsSettings(BaseSettings):
     allow_credentials: bool = Field(default=True)
 
 
+class RetrievalSettings(BaseSettings):
+    """Hybrid retrieval configuration."""
+
+    top_k: int = Field(default=10, description="Final number of passages returned")
+    vector_top_k: int = Field(default=20, description="Candidates fetched from the vector store")
+    graph_top_k: int = Field(default=10, description="Candidates fetched from the knowledge graph")
+    graph_depth: int = Field(default=1, description="Graph traversal hops around seed entities")
+    vector_weight: float = Field(default=1.0, description="Weight applied to vector scores")
+    graph_weight: float = Field(default=0.6, description="Weight applied to graph scores")
+    reranker: str = Field(default="lexical", description="Reranker: 'lexical' or 'none'")
+    rerank_top_k: int = Field(default=10, description="Passages passed through the reranker")
+
+
 class APISettings(BaseSettings):
     """HTTP API behaviour settings."""
 
@@ -78,6 +91,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
     embeddings: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+    retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
     cors: CorsSettings = Field(default_factory=CorsSettings)
 
 
