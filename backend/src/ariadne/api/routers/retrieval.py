@@ -13,6 +13,7 @@ from ariadne.core.errors import EmbeddingProviderError
 from ariadne.embeddings.factory import get_embedding_provider
 from ariadne.graph.service import GraphExtractionService
 from ariadne.graph.store import GraphStore
+from ariadne.retrieval.orchestrator import HybridRetrievalService
 from ariadne.vectors.numpy_store import NumpyVectorStore
 from ariadne.vectors.service import VectorIndexService
 
@@ -44,6 +45,20 @@ class GraphSearchResponse(BaseModel):
 
     query: str
     hits: list[RetrievedChunk]
+
+
+class HybridHit(RetrievedChunk):
+    """A fused retrieval hit with its contributing sources."""
+
+    sources: list[str] = Field(default_factory=list)
+    rerank_score: float | None = None
+
+
+class HybridSearchResponse(BaseModel):
+    """Result of a hybrid vector + graph search."""
+
+    query: str
+    hits: list[HybridHit]
 
 
 @router.get("/vector/search", response_model=SearchResponse, summary="Search the vector index")
@@ -112,5 +127,34 @@ def graph_search(
                 score=match.score,
             )
             for match in matches
+        ],
+    )
+
+
+@router.get(
+    "/hybrid/search", response_model=HybridSearchResponse, summary="Search vector and graph jointly"
+)
+def hybrid_search(
+    db: Db,
+    q: str = Query(..., min_length=1, max_length=2000, description="Search query"),
+    top_k: int = Query(default=10, ge=1, le=50),
+    document_ids: list[str] | None = Query(default=None),
+) -> HybridSearchResponse:
+    service = HybridRetrievalService()
+    passages = service.retrieve(db, q, top_k=top_k, document_ids=document_ids)
+    return HybridSearchResponse(
+        query=q,
+        hits=[
+            HybridHit(
+                chunk_id=passage.chunk_id,
+                document_id=passage.document_id,
+                index=passage.index,
+                page_numbers=passage.page_numbers,
+                text=passage.text,
+                score=passage.score,
+                sources=passage.sources,
+                rerank_score=passage.rerank_score,
+            )
+            for passage in passages
         ],
     )
