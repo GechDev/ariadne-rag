@@ -66,6 +66,24 @@ class RetrievalSettings(BaseSettings):
     rerank_top_k: int = Field(default=10, description="Passages passed through the reranker")
 
 
+class GenerationSettings(BaseSettings):
+    """Grounded answer generation configuration."""
+
+    provider: str = Field(
+        default="deterministic",
+        description="LLM provider: 'deterministic' or 'local'",
+    )
+    model: str = Field(
+        default="HuggingFaceH4/zephyr-7b-beta", description="Local model name"
+    )
+    max_tokens: int = Field(default=512, description="Maximum generated tokens")
+    temperature: float = Field(default=0.2, description="Sampling temperature")
+    max_context_chars: int = Field(
+        default=8000, description="Context budget supplied to the model"
+    )
+    max_passages: int = Field(default=6, description="Passages included in the prompt")
+
+
 class APISettings(BaseSettings):
     """HTTP API behaviour settings."""
 
@@ -92,6 +110,7 @@ class Settings(BaseSettings):
     storage: StorageSettings = Field(default_factory=StorageSettings)
     embeddings: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
+    generation: GenerationSettings = Field(default_factory=GenerationSettings)
     cors: CorsSettings = Field(default_factory=CorsSettings)
 
 
