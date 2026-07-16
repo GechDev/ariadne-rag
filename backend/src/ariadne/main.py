@@ -9,8 +9,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from ariadne.api.routers.conversations import router as conversations_router
 from ariadne.api.routers.documents import router as documents_router
 from ariadne.api.routers.health import router as health_router
+from ariadne.api.routers.query import router as query_router
 from ariadne.api.routers.retrieval import router as retrieval_router
 from ariadne.config import get_settings
 from ariadne.core.errors import AriadneError
@@ -50,6 +52,8 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(documents_router)
     app.include_router(retrieval_router)
+    app.include_router(query_router)
+    app.include_router(conversations_router)
 
     @app.exception_handler(AriadneError)
     async def ariadne_error_handler(request: Request, exc: AriadneError) -> JSONResponse:
