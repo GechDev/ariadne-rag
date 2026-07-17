@@ -14,6 +14,7 @@ from ariadne.api.routers.documents import router as documents_router
 from ariadne.api.routers.health import router as health_router
 from ariadne.api.routers.query import router as query_router
 from ariadne.api.routers.retrieval import router as retrieval_router
+from ariadne.api.routers.stream import router as stream_router
 from ariadne.config import get_settings
 from ariadne.core.errors import AriadneError
 from ariadne.db.init import init_db
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(documents_router)
     app.include_router(retrieval_router)
     app.include_router(query_router)
+    app.include_router(stream_router)
     app.include_router(conversations_router)
 
     @app.exception_handler(AriadneError)
