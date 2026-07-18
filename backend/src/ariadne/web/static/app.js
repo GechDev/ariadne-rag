@@ -240,6 +240,29 @@ function clearProgress(el) {
   if (progress) progress.remove();
 }
 
+function renderCitations(el, citations) {
+  const existing = el.querySelector(".citations");
+  if (existing) existing.remove();
+  if (!citations || !citations.length) return;
+  const wrap = document.createElement("div");
+  wrap.className = "citations";
+  citations.forEach((citation, i) => {
+    const pages = citation.page_numbers && citation.page_numbers.length
+      ? ` · p. ${citation.page_numbers.join(", ")}`
+      : "";
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "citation-chip";
+    chip.dataset.chunkId = citation.chunk_id;
+    chip.title = `${citation.document_title || "Source"}${pages}`;
+    chip.innerHTML = `<strong>[${i + 1}]</strong> <span class="chip-title">${escapeHtml(citation.document_title || "Source")}</span>`;
+    chip.addEventListener("click", () => onCitationClick(citation));
+    wrap.appendChild(chip);
+  });
+  el.appendChild(wrap);
+  scrollToBottom();
+}
+
 function parseSseEvent(raw, onEvent) {
   let event = "message";
   const dataLines = [];
@@ -264,6 +287,7 @@ async function runStream(question, assistantEl) {
   const controller = new AbortController();
   state.stream = controller;
   let answer = "";
+  let citations = [];
   try {
     const response = await fetch("/query/stream", {
       method: "POST",
@@ -288,6 +312,7 @@ async function runStream(question, assistantEl) {
           break;
         case "sources_found":
           showProgress(assistantEl, `${data.sources.length} sources identified`);
+          citations = data.sources || [];
           break;
         case "generation_started":
           clearProgress(assistantEl);
@@ -301,10 +326,12 @@ async function runStream(question, assistantEl) {
         case "generation_completed":
           if (data.conversation_id) state.conversationId = data.conversation_id;
           answer = data.answer || answer;
+          citations = data.citations || citations;
           setAssistantText(assistantEl, answer);
           break;
         case "done":
           assistantEl.classList.remove("streaming", "answering");
+          renderCitations(assistantEl, citations);
           break;
         case "error":
           throw new Error(data.message || "Query failed");
