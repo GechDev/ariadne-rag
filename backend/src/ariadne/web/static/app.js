@@ -387,6 +387,7 @@ async function runStream(question, assistantEl) {
   state.stream = controller;
   let answer = "";
   let citations = [];
+  let completed = false;
   try {
     const response = await fetch("/query/stream", {
       method: "POST",
@@ -429,6 +430,7 @@ async function runStream(question, assistantEl) {
           setAssistantText(assistantEl, answer);
           break;
         case "done":
+          completed = true;
           assistantEl.classList.remove("streaming", "answering");
           renderCitations(assistantEl, citations);
           break;
@@ -447,6 +449,11 @@ async function runStream(question, assistantEl) {
         buffer = buffer.slice(boundary + 2);
         parseSseEvent(raw, handleEvent);
       }
+    }
+    if (!completed) {
+      assistantEl.classList.add("error");
+      setAssistantText(assistantEl, answer || "Response ended before completion.");
+      toast("Stream ended unexpectedly", "error");
     }
   } catch (error) {
     assistantEl.classList.add("error");
@@ -524,6 +531,9 @@ document.addEventListener("DOMContentLoaded", () => {
     sendQuestion().catch((error) => toast(error.message, "error"));
   });
   $("close-source").addEventListener("click", () => setSourcePanelVisible(false));
+  $("stop-btn").addEventListener("click", () => {
+    if (state.stream) state.stream.abort();
+  });
 
   loadConversations().catch((error) => toast(error.message, "error"));
   $("new-chat").addEventListener("click", newConversation);
