@@ -147,10 +147,72 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+/* ---------- Document upload & lifecycle ---------- */
+
+async function uploadDocuments(files) {
+  if (!files.length) return;
+  const form = new FormData();
+  for (const file of files) {
+    form.append("file", file);
+  }
+  const button = $("upload-btn");
+  button.disabled = true;
+  try {
+    const result = await api("/documents", { method: "POST", body: form });
+    toast(`Uploaded ${result.document.filename}`, "success");
+    await loadDocuments();
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function ingestDocument(id) {
+  try {
+    const result = await api(`/documents/${encodeURIComponent(id)}/ingest`, { method: "POST" });
+    toast(`${result.chunks} chunks indexed`, "success");
+    await loadDocuments();
+  } catch (error) {
+    toast(error.message, "error");
+    await loadDocuments();
+  }
+}
+
+async function deleteDocument(id) {
+  const item = document.querySelector(`.document-item[data-id="${id}"]`);
+  const name = item ? item.querySelector(".doc-name").textContent : "document";
+  if (!window.confirm(`Delete "${name}"? This removes its index and graph data.`)) return;
+  try {
+    await api(`/documents/${encodeURIComponent(id)}`, { method: "DELETE" });
+    toast("Document deleted", "success");
+    await loadDocuments();
+  } catch (error) {
+    toast(error.message, "error");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   checkHealth();
   loadDocuments().catch((error) => toast(error.message, "error"));
   $("refresh-docs").addEventListener("click", () => {
     loadDocuments().catch((error) => toast(error.message, "error"));
+  });
+
+  const fileInput = $("file-input");
+  const fileLabel = $("file-label");
+  fileInput.addEventListener("change", () => {
+    const names = Array.from(fileInput.files).map((file) => file.name);
+    fileLabel.textContent = names.length
+      ? names.length === 1
+        ? names[0]
+        : `${names.length} files selected`
+      : "Choose files…";
+    $("upload-btn").disabled = names.length === 0;
+  });
+  $("upload-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    uploadDocuments(Array.from(fileInput.files)).catch((error) => toast(error.message, "error"));
+    fileInput.value = "";
+    fileLabel.textContent = "Choose files…";
+    $("upload-btn").disabled = true;
   });
 });
