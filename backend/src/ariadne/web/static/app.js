@@ -181,6 +181,71 @@ async function onCitationClick(citation) {
   }
 }
 
+/* ---------- Conversation history ---------- */
+
+async function loadConversations() {
+  state.conversations = await api("/conversations");
+  renderConversations();
+}
+
+function renderConversations() {
+  const list = $("conversation-list");
+  if (!state.conversations.length) {
+    list.innerHTML = `<li class="empty-hint">No conversations yet.</li>`;
+    return;
+  }
+  list.innerHTML = "";
+  for (const conversation of state.conversations) {
+    const item = document.createElement("li");
+    item.className = "conversation-item";
+    item.dataset.id = conversation.id;
+    if (conversation.id === state.conversationId) item.classList.add("active");
+    item.innerHTML = `
+      <div class="conv-title">${escapeHtml(conversation.title || "New conversation")}</div>
+      <div class="conv-time">${escapeHtml(formatDate(conversation.updated_at))}</div>
+    `;
+    item.addEventListener("click", () => openConversation(conversation.id));
+    list.appendChild(item);
+  }
+}
+
+function clearChat() {
+  $("message-list").innerHTML = "";
+}
+
+async function openConversation(id) {
+  if (state.stream) state.stream.abort();
+  state.conversationId = id;
+  renderConversations();
+  const conversation = await api(`/conversations/${encodeURIComponent(id)}`);
+  clearChat();
+  for (const message of conversation.messages) {
+    const el = appendMessage(message.role, message.content);
+    if (message.role === "assistant") {
+      loadMessageCitations(conversation.id, message.id, el);
+    }
+  }
+}
+
+async function loadMessageCitations(conversationId, messageId, el) {
+  try {
+    const citations = await api(
+      `/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/citations`
+    );
+    renderCitations(el, citations);
+  } catch {
+    /* citations are optional in history view */
+  }
+}
+
+function newConversation() {
+  if (state.stream) state.stream.abort();
+  state.conversationId = null;
+  clearChat();
+  renderConversations();
+  $("chat-input").focus();
+}
+
 /* ---------- Document upload & lifecycle ---------- */
 
 async function uploadDocuments(files) {
@@ -411,6 +476,7 @@ async function sendQuestion() {
   setSendBusy(true);
   await runStream(question, assistantEl);
   setSendBusy(false);
+  loadConversations().catch((error) => toast(error.message, "error"));
 }
 
 function autosize() {
@@ -458,4 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sendQuestion().catch((error) => toast(error.message, "error"));
   });
   $("close-source").addEventListener("click", () => setSourcePanelVisible(false));
+
+  loadConversations().catch((error) => toast(error.message, "error"));
+  $("new-chat").addEventListener("click", newConversation);
 });
