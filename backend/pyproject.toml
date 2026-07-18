@@ -49,6 +49,7 @@ ariadne = "ariadne.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ariadne"]
+include = ["ariadne/web/static/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

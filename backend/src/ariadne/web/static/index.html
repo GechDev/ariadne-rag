@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARIADNE</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">A</span>
+      <div class="brand-copy">
+        <h1>ARIADNE</h1>
+        <p>Local-first RAG for private documents</p>
+      </div>
+    </div>
+    <div class="header-status" title="API connection">
+      <span id="api-status" class="status-dot"></span>
+      <span id="api-status-text">connecting</span>
+    </div>
+  </header>
+
+  <main class="app-body">
+    <aside class="sidebar">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Documents</h2>
+          <button id="refresh-docs" class="icon-btn" type="button" title="Refresh documents">&#8635;</button>
+        </div>
+        <form id="upload-form" class="upload-form">
+          <label class="file-picker" for="file-input">
+            <input type="file" id="file-input" name="file" multiple />
+            <span id="file-label">Choose files…</span>
+          </label>
+          <button type="submit" class="btn btn-primary btn-sm" id="upload-btn" disabled>Upload</button>
+        </form>
+        <ul id="document-list" class="document-list"></ul>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Conversations</h2>
+          <button id="new-chat" class="icon-btn" type="button" title="New conversation">&#xff0b;</button>
+        </div>
+        <ul id="conversation-list" class="conversation-list"></ul>
+      </section>
+    </aside>
+
+    <section class="chat-area">
+      <div id="message-list" class="message-list" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form">
+        <textarea id="chat-input" rows="1" placeholder="Ask a question about your documents…" autocomplete="off"></textarea>
+        <button type="submit" class="btn btn-primary" id="send-btn">Send</button>
+        <button type="button" class="btn btn-danger" id="stop-btn" hidden>Stop</button>
+      </form>
+    </section>
+
+    <aside id="source-panel" class="source-panel" hidden>
+      <div class="panel-head">
+        <h2>Source</h2>
+        <button id="close-source" class="icon-btn" type="button" title="Close source">&times;</button>
+      </div>
+      <div id="source-content" class="source-content"></div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

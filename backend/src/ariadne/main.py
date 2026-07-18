@@ -19,6 +19,7 @@ from ariadne.config import get_settings
 from ariadne.core.errors import AriadneError
 from ariadne.db.init import init_db
 from ariadne.logging import configure_logging, get_logger
+from ariadne.web import web_static_app
 
 
 @asynccontextmanager
@@ -56,6 +57,8 @@ def create_app() -> FastAPI:
     app.include_router(query_router)
     app.include_router(stream_router)
     app.include_router(conversations_router)
+
+    app.mount("/", web_static_app())
 
     @app.exception_handler(AriadneError)
     async def ariadne_error_handler(request: Request, exc: AriadneError) -> JSONResponse:
