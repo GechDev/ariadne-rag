@@ -190,6 +190,174 @@ async function deleteDocument(id) {
   }
 }
 
+/* ---------- Streaming chat ---------- */
+
+function scrollToBottom() {
+  const list = $("message-list");
+  list.scrollTop = list.scrollHeight;
+}
+
+function appendMessage(role, content) {
+  const list = $("message-list");
+  const el = document.createElement("div");
+  el.className = `message ${role}`;
+  const text = document.createElement("div");
+  text.className = "msg-text";
+  text.textContent = content;
+  if (role === "assistant") {
+    const label = document.createElement("span");
+    label.className = "msg-role";
+    label.textContent = "ARIADNE";
+    el.append(label, text);
+  } else {
+    el.appendChild(text);
+  }
+  list.appendChild(el);
+  scrollToBottom();
+  return el;
+}
+
+function setAssistantText(el, text) {
+  const textEl = el.querySelector(".msg-text");
+  if (textEl) textEl.textContent = text;
+}
+
+function showProgress(el, text) {
+  clearProgress(el);
+  const progress = document.createElement("div");
+  progress.className = "msg-progress";
+  const spinner = document.createElement("span");
+  spinner.className = "spinner";
+  const caption = document.createElement("span");
+  caption.textContent = text;
+  progress.append(spinner, caption);
+  el.appendChild(progress);
+  scrollToBottom();
+}
+
+function clearProgress(el) {
+  const progress = el.querySelector(".msg-progress");
+  if (progress) progress.remove();
+}
+
+function parseSseEvent(raw, onEvent) {
+  let event = "message";
+  const dataLines = [];
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("event:")) {
+      event = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).replace(/^ /, ""));
+    }
+  }
+  if (!dataLines.length) return;
+  let data = {};
+  try {
+    data = JSON.parse(dataLines.join("\n"));
+  } catch {
+    /* ignore malformed payloads */
+  }
+  onEvent(event, data);
+}
+
+async function runStream(question, assistantEl) {
+  const controller = new AbortController();
+  state.stream = controller;
+  let answer = "";
+  try {
+    const response = await fetch("/query/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({ question, conversation_id: state.conversationId }),
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`Stream request failed (${response.status})`);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    const handleEvent = (event, data) => {
+      switch (event) {
+        case "retrieval_started":
+          showProgress(assistantEl, "Retrieving sources…");
+          break;
+        case "retrieval_completed":
+          showProgress(assistantEl, `Found ${data.retrieved} candidate passages`);
+          break;
+        case "sources_found":
+          showProgress(assistantEl, `${data.sources.length} sources identified`);
+          break;
+        case "generation_started":
+          clearProgress(assistantEl);
+          assistantEl.classList.add("answering");
+          break;
+        case "token":
+          answer += data.token || "";
+          setAssistantText(assistantEl, answer);
+          scrollToBottom();
+          break;
+        case "generation_completed":
+          if (data.conversation_id) state.conversationId = data.conversation_id;
+          answer = data.answer || answer;
+          setAssistantText(assistantEl, answer);
+          break;
+        case "done":
+          assistantEl.classList.remove("streaming", "answering");
+          break;
+        case "error":
+          throw new Error(data.message || "Query failed");
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let boundary;
+      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        parseSseEvent(raw, handleEvent);
+      }
+    }
+  } catch (error) {
+    assistantEl.classList.add("error");
+    if (error.name === "AbortError") {
+      setAssistantText(assistantEl, answer || "Response interrupted.");
+      toast("Streaming stopped", "info");
+    } else {
+      setAssistantText(assistantEl, `Error: ${error.message}`);
+      toast(error.message, "error");
+    }
+  } finally {
+    assistantEl.classList.remove("streaming", "answering");
+    clearProgress(assistantEl);
+    state.stream = null;
+  }
+}
+
+async function sendQuestion() {
+  const input = $("chat-input");
+  const question = input.value.trim();
+  if (!question || state.stream) return;
+  input.value = "";
+  autosize();
+  appendMessage("user", question);
+  const assistantEl = appendMessage("assistant", "");
+  assistantEl.classList.add("streaming");
+  setSendBusy(true);
+  await runStream(question, assistantEl);
+  setSendBusy(false);
+}
+
+function autosize() {
+  const input = $("chat-input");
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   checkHealth();
   loadDocuments().catch((error) => toast(error.message, "error"));
@@ -214,5 +382,18 @@ document.addEventListener("DOMContentLoaded", () => {
     fileInput.value = "";
     fileLabel.textContent = "Choose files…";
     $("upload-btn").disabled = true;
+  });
+
+  const chatInput = $("chat-input");
+  chatInput.addEventListener("input", autosize);
+  chatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      $("chat-form").requestSubmit();
+    }
+  });
+  $("chat-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    sendQuestion().catch((error) => toast(error.message, "error"));
   });
 });
