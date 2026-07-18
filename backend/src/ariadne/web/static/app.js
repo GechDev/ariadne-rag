@@ -65,6 +65,92 @@ function setSendBusy(busy) {
   if (!busy) $("chat-input").focus();
 }
 
+/* ---------- Document library ---------- */
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+async function loadDocuments() {
+  state.documents = await api("/documents");
+  renderDocuments();
+}
+
+function renderDocuments() {
+  const list = $("document-list");
+  if (!state.documents.length) {
+    list.innerHTML = `<li class="empty-hint">No documents yet — upload a file to begin indexing.</li>`;
+    return;
+  }
+  list.innerHTML = "";
+  for (const doc of state.documents) {
+    const item = document.createElement("li");
+    item.className = "document-item";
+    item.dataset.id = doc.id;
+
+    const main = document.createElement("div");
+    main.className = "doc-main";
+    main.innerHTML = `
+      <span class="doc-name" title="${escapeHtml(doc.filename)}">${escapeHtml(doc.filename)}</span>
+      <span class="badge ${escapeHtml(doc.status)}">${escapeHtml(doc.status)}</span>
+    `;
+
+    const meta = document.createElement("div");
+    meta.className = "doc-meta";
+    const info = document.createElement("span");
+    info.textContent = `${formatBytes(doc.size_bytes)} · ${formatDate(doc.created_at)}`;
+    const actions = document.createElement("span");
+    actions.className = "doc-actions";
+    actions.appendChild(makeIngestButton(doc));
+    actions.appendChild(makeDeleteButton(doc.id));
+    meta.append(info, actions);
+
+    item.append(main, meta);
+    list.appendChild(item);
+  }
+}
+
+function makeIngestButton(doc) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn-link";
+  button.textContent = doc.status === "ready" ? "reindex" : "index";
+  button.title = "Run the ingestion pipeline";
+  button.disabled = doc.status === "ingesting";
+  button.addEventListener("click", () => ingestDocument(doc.id));
+  return button;
+}
+
+function makeDeleteButton(id) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn-link danger";
+  button.textContent = "delete";
+  button.addEventListener("click", () => deleteDocument(id));
+  return button;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   checkHealth();
+  loadDocuments().catch((error) => toast(error.message, "error"));
+  $("refresh-docs").addEventListener("click", () => {
+    loadDocuments().catch((error) => toast(error.message, "error"));
+  });
 });
