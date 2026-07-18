@@ -147,6 +147,40 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+/* ---------- Source preview ---------- */
+
+function setSourcePanelVisible(visible) {
+  $("source-panel").hidden = !visible;
+  document.querySelector(".app-body").classList.toggle("no-source", !visible);
+}
+
+function renderSource(citation, text) {
+  const content = $("source-content");
+  const pages = citation.page_numbers && citation.page_numbers.length
+    ? citation.page_numbers.join(", ")
+    : "";
+  content.innerHTML = `
+    <div class="source-doc">${escapeHtml(citation.document_title || "Source")}</div>
+    <div class="source-pages">${pages ? `Pages: ${escapeHtml(pages)}` : "No page metadata"}</div>
+    <div class="source-text">${escapeHtml(text)}</div>
+  `;
+  setSourcePanelVisible(true);
+}
+
+async function onCitationClick(citation) {
+  try {
+    const chunks = await api(`/documents/${encodeURIComponent(citation.document_id)}/chunks?limit=1000`);
+    const chunk = chunks.find((c) => c.id === citation.chunk_id) || chunks[citation.index];
+    if (!chunk) {
+      toast("Source passage unavailable", "error");
+      return;
+    }
+    renderSource(citation, chunk.text);
+  } catch (error) {
+    toast(error.message, "error");
+  }
+}
+
 /* ---------- Document upload & lifecycle ---------- */
 
 async function uploadDocuments(files) {
@@ -423,4 +457,5 @@ document.addEventListener("DOMContentLoaded", () => {
     event.preventDefault();
     sendQuestion().catch((error) => toast(error.message, "error"));
   });
+  $("close-source").addEventListener("click", () => setSourcePanelVisible(false));
 });
